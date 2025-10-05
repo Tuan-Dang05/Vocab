@@ -3,8 +3,8 @@ const STORAGE_KEYS = {
     words: 'fv_words_v1',
     tg: 'fv_tg_cfg_v1'
 };
-// const API_BASE = 'https://2.anonm.my.eu.org';
-const API_BASE = 'http://localhost:3000';
+const API_BASE = 'https://2.anonm.my.eu.org';
+// const API_BASE = 'http://localhost:3000';
 const TTS_KEY = 'fv_tts_voice_v1';
 const AUTH_COOKIE = 'fv_auth_token';
 const AUTH_EMAIL_KEY = 'fv_auth_email';

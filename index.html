@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Học Từ Vựng - Flashcards</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header class="app-header">
+        <h1>Học Từ Vựng Tiếng Anh</h1>
+        <nav class="tabs">
+            <button class="tab-button active" data-tab="flashcards">Flashcards</button>
+            <button class="tab-button" data-tab="add">Thêm từ</button>
+            <button class="tab-button" data-tab="analyze">Phân tích</button>
+            <button class="tab-button" data-tab="telegram">Nhắc Telegram</button>
+            <button class="tab-button" data-tab="account">Tài khoản</button>
+        </nav>
+        <div id="banner" class="banner">
+            <div id="banner-text" class="marquee"></div>
+        </div>
+    </header>
+
+    <main class="app-main">
+        <!-- Flashcards tab -->
+        <section id="tab-flashcards" class="tab active">
+            <div class="flashcard" id="flashcard">
+                <div class="flashcard-inner" id="flashcard-inner">
+                    <div class="flashcard-face flashcard-front">
+                        <div class="word-line">
+                            <span id="word" class="word">—</span>
+                            <button id="play-audio" class="icon-button" title="Phát phát âm">🔊</button>
+                        </div>
+                        <div class="phonetics" id="phonetics">&nbsp;</div>
+                        <div class="pos" id="pos">&nbsp;</div>
+                        <div class="progress" id="progress">0 / 0</div>
+                    </div>
+                    <div class="flashcard-face flashcard-back">
+                        <div class="definition" id="definition">—</div>
+                        <div class="example" id="example">—</div>
+                    </div>
+                </div>
+            </div>
+            <div class="controls">
+                <button id="prev">⟵ Trước</button>
+                <button id="flip">Lật thẻ</button>
+                <button id="next">Tiếp ⟶</button>
+                <button id="shuffle">Trộn</button>
+                <button id="mark-known">Đã biết</button>
+                <button id="delete-word" class="danger">Xoá</button>
+            </div>
+            <div class="filters">
+                <label>
+                    Bộ thẻ:
+                    <select id="deck-filter">
+                        <option value="all">Tất cả</option>
+                        <option value="new">Mới</option>
+                        <option value="learning">Đang học</option>
+                        <option value="known">Đã biết</option>
+                    </select>
+                </label>
+                <label>
+                    Tìm kiếm:
+                    <input type="text" id="search" placeholder="Từ hoặc nghĩa...">
+                </label>
+                <label>
+                    Giọng đọc
+                    <select id="tts-voice"></select>
+                </label>
+            </div>
+            <div class="card">
+                <h2>Phân tích</h2>
+                <div id="inline-analysis" class="analysis">—</div>
+            </div>
+        </section>
+
+        <!-- Add tab -->
+        <section id="tab-add" class="tab">
+            <form id="add-form" class="card">
+                <h2>Thêm từ mới</h2>
+                <div class="grid-2">
+                    <label>
+                        Từ tiếng Anh
+                        <input id="add-word" type="text" placeholder="vd: benevolent" required>
+                    </label>
+                    <label>
+                        Nghĩa (tiếng Việt)
+                        <input id="add-meaning" type="text" placeholder="vd: nhân từ, nhân hậu">
+                    </label>
+                </div>
+                <label>
+                    Ví dụ
+                    <textarea id="add-example" rows="2" placeholder="vd: She is benevolent to everyone."></textarea>
+                </label>
+                <div class="row">
+                    <label class="checkbox">
+                        <input id="auto-analyze" type="checkbox" checked>
+                        Tự phân tích từ qua từ điển (khuyến nghị)
+                    </label>
+                </div>
+                <div class="row">
+                    <button type="submit">Lưu</button>
+                    <button type="button" id="analyze-now">Phân tích ngay</button>
+                </div>
+                <div id="add-feedback" class="feedback"></div>
+            </form>
+            <div class="card" id="preview-card" hidden>
+                <h3>Xem nhanh</h3>
+                <div id="preview-content">—</div>
+            </div>
+        </section>
+
+        <!-- Analyze tab -->
+        <section id="tab-analyze" class="tab">
+            <div class="card">
+                <h2>Phân tích từ vựng</h2>
+                <div class="grid-2">
+                    <label>
+                        Từ cần phân tích
+                        <input id="analyze-word" type="text" placeholder="vd: elaborate">
+                    </label>
+                    <div class="row align-end">
+                        <button id="btn-analyze">Phân tích</button>
+                    </div>
+                </div>
+                <div id="analyze-result" class="analysis"></div>
+            </div>
+        </section>
+
+        <!-- Telegram tab -->
+        <section id="tab-telegram" class="tab">
+            <form id="tg-form" class="card">
+                <h2>Nhắc học hằng ngày qua Telegram</h2>
+                <div class="tg-status">
+                    <span id="tg-status-badge" class="status-badge status-off">Chưa kết nối</span>
+                    <span id="tg-status-desc" class="status-desc">Nhập bot token và phát hiện chat</span>
+                </div>
+                <div class="grid-2">
+                    <label>
+                        Bot token
+                        <input id="tg-token" type="password" placeholder="bot123:ABC...">
+                    </label>
+                    <div class="hint">Chỉ cần nhập bot token. Hãy nhắn bất kỳ tin tới bot của bạn, hệ thống sẽ tự phát
+                        hiện chat.</div>
+                </div>
+                <div class="grid-3">
+                    <label>
+                        Giờ nhắc (24h)
+                        <input id="tg-hour" type="number" min="0" max="23" value="8">
+                    </label>
+                    <label>
+                        Phút
+                        <input id="tg-minute" type="number" min="0" max="59" value="0">
+                    </label>
+                    <div class="switch-wrap">
+                        <span>Bật nhắc hằng ngày</span>
+                        <label class="switch">
+                            <input id="tg-enabled" type="checkbox">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="row">
+                    <button type="submit">Lưu cấu hình</button>
+                    <button type="button" id="tg-detect">Tự phát hiện Chat</button>
+                    <button type="button" id="tg-test">Gửi tin thử</button>
+                </div>
+                <!-- <div class="hint">Lưu ý: Gửi từ trình duyệt có thể không xem được phản hồi do CORS, nhưng tin vẫn có thể -->
+                <!-- tới Telegram.</div> -->
+                <div id="tg-feedback" class="feedback"></div>
+            </form>
+        </section>
+
+        <!-- Account tab -->
+        <section id="tab-account" class="tab">
+            <div class="card">
+                <h2>Tài khoản</h2>
+                <div class="grid-2">
+                    <form id="form-register">
+                        <h3>Đăng ký</h3>
+                        <label>Email
+                            <input id="reg-email" type="email" required placeholder="you@example.com">
+                        </label>
+                        <label>Mật khẩu
+                            <input id="reg-pass" type="password" required>
+                        </label>
+                        <button type="submit">Tạo tài khoản</button>
+                        <div id="reg-feedback" class="feedback"></div>
+                    </form>
+                    <form id="form-login">
+                        <h3>Đăng nhập</h3>
+                        <label>Email
+                            <input id="login-email" type="email" required>
+                        </label>
+                        <label>Mật khẩu
+                            <input id="login-pass" type="password" required>
+                        </label>
+                        <button type="submit">Đăng nhập</button>
+                        <div id="login-feedback" class="feedback"></div>
+                    </form>
+                </div>
+                <div class="row" style="margin-top:12px">
+                    <button id="btn-logout">Đăng xuất</button>
+                    <div id="auth-status" class="hint">Chưa đăng nhập</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="app-footer">
+        <span>© 2025 Flash Vocab</span>
+        <span id="total-count">0 từ</span>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

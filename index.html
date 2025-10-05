@@ -88,15 +88,15 @@
                         Từ tiếng Anh
                         <input id="add-word" type="text" placeholder="vd: benevolent" required>
                     </label>
-                    <label>
+                    <!-- <label>
                         Nghĩa (tiếng Việt)
                         <input id="add-meaning" type="text" placeholder="vd: nhân từ, nhân hậu">
-                    </label>
+                    </label> -->
                 </div>
-                <label>
+                <!-- <label>
                     Ví dụ
                     <textarea id="add-example" rows="2" placeholder="vd: She is benevolent to everyone."></textarea>
-                </label>
+                </label> -->
                 <div class="row">
                     <label class="checkbox">
                         <input id="auto-analyze" type="checkbox" checked>
@@ -138,15 +138,24 @@
                 <h2>Nhắc học hằng ngày qua Telegram</h2>
                 <div class="tg-status">
                     <span id="tg-status-badge" class="status-badge status-off">Chưa kết nối</span>
-                    <span id="tg-status-desc" class="status-desc">Nhập bot token và phát hiện chat</span>
+                    <span id="tg-status-desc" class="status-desc">Mở Telegram bot @tunz_vocab_bot, bấm Bắt đầu và nhập
+                        email đã đăng ký trên website để liên kết.</span>
                 </div>
-                <div class="grid-2">
-                    <label>
-                        Bot token
-                        <input id="tg-token" type="password" placeholder="bot123:ABC...">
-                    </label>
-                    <div class="hint">Chỉ cần nhập bot token. Hãy nhắn bất kỳ tin tới bot của bạn, hệ thống sẽ tự phát
-                        hiện chat.</div>
+                <div class="card" style="margin-top:12px">
+                    <h3>Hướng dẫn liên kết</h3>
+                    <ol class="steps">
+                        <li>Đảm bảo bạn đã <strong>đăng ký</strong> và <strong>đăng nhập</strong> trên website
+                            <a href="https://vocab-lilac.vercel.app/" target="_blank"
+                                rel="noopener">vocab-lilac.vercel.app</a>.
+                        </li>
+                        <li>Mở Telegram và tìm bot
+                            <a href="https://t.me/tunz_vocab_bot" target="_blank" rel="noopener">@tunz_vocab_bot</a>,
+                            bấm <em>Bắt đầu</em>.
+                        </li>
+                        <li>Nhập <strong>email</strong> bạn đã đăng ký để liên kết tài khoản.</li>
+                        <li>Quay lại đây để cài đặt <strong>giờ/phút</strong> và <strong>bật nhắc</strong>.</li>
+                    </ol>
+                    <div class="hint">Nếu đã liên kết nhưng chưa nhận được tin, hãy thử nút “Gửi tin thử”.</div>
                 </div>
                 <div class="grid-3">
                     <label>
@@ -167,7 +176,7 @@
                 </div>
                 <div class="row">
                     <button type="submit">Lưu cấu hình</button>
-                    <button type="button" id="tg-detect">Tự phát hiện Chat</button>
+                    <button type="button" id="tg-detect" hidden>Tự phát hiện Chat</button>
                     <button type="button" id="tg-test">Gửi tin thử</button>
                 </div>
                 <!-- <div class="hint">Lưu ý: Gửi từ trình duyệt có thể không xem được phản hồi do CORS, nhưng tin vẫn có thể -->

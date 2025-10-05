@@ -3,7 +3,8 @@ const STORAGE_KEYS = {
     words: 'fv_words_v1',
     tg: 'fv_tg_cfg_v1'
 };
-const API_BASE = 'https://2.anonm.my.eu.org';
+// const API_BASE = 'https://2.anonm.my.eu.org';
+const API_BASE = 'http://localhost:3000';
 const TTS_KEY = 'fv_tts_voice_v1';
 const AUTH_COOKIE = 'fv_auth_token';
 const AUTH_EMAIL_KEY = 'fv_auth_email';
@@ -99,6 +100,17 @@ async function apiTgSaveConfig(cfg) {
 async function apiTgLoadConfig() {
     if (!hasAuthToken()) return null;
     const r = await fetch(`${API_BASE}/api/telegram/config`, { headers: { ...getAuthHeaders() } });
+    return r.ok ? r.json() : null;
+}
+async function apiTgStatus() {
+    if (!hasAuthToken()) return { connected: false, chatId: '' };
+    const r = await fetch(`${API_BASE}/api/telegram/status`, { headers: { ...getAuthHeaders() } });
+    if (!r.ok) return { connected: false, chatId: '' };
+    return r.json();
+}
+async function apiTgTestSend(text) {
+    if (!hasAuthToken()) return null;
+    const r = await fetch(`${API_BASE}/api/telegram/test-send`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ text }) });
     return r.ok ? r.json() : null;
 }
 
@@ -314,12 +326,15 @@ function renderPreview(v) {
     $('preview-card').hidden = false;
 }
 
+function safeValue(id) { const el = /** @type {HTMLInputElement|HTMLTextAreaElement|null} */($(id)); return el && typeof el.value === 'string' ? el.value.trim() : ''; }
+function safeChecked(id) { const el = /** @type {HTMLInputElement|null} */($(id)); return !!(el && el.checked); }
 function getFormValues() {
     return {
-        word: /** @type {HTMLInputElement} */($('add-word')).value.trim(),
-        meaning: /** @type {HTMLInputElement} */($('add-meaning')).value.trim(),
-        example: /** @type {HTMLTextAreaElement} */($('add-example')).value.trim(),
-        autoAnalyze: /** @type {HTMLInputElement} */($('auto-analyze')).checked
+        word: safeValue('add-word'),
+        // 'add-meaning' may be absent in the DOM (optional field)
+        meaning: safeValue('add-meaning'),
+        example: safeValue('add-example'),
+        autoAnalyze: safeChecked('auto-analyze')
     };
 }
 
@@ -426,19 +441,22 @@ function scheduleDailyReminder() {
 
 function initTelegramUI() {
     const cfg = loadTgCfg();
-    $('tg-token').value = cfg.token || '';
     $('tg-hour').value = cfg.hour ?? 8;
     $('tg-minute').value = cfg.minute ?? 0;
     $('tg-enabled').checked = !!cfg.enabled;
     const statusBadge = document.getElementById('tg-status-badge');
     const statusDesc = document.getElementById('tg-status-desc');
-    const connected = !!(cfg.token && cfg.chatId);
-    if (statusBadge) {
-        statusBadge.classList.toggle('status-on', connected);
-        statusBadge.classList.toggle('status-off', !connected);
-        statusBadge.textContent = connected ? 'Đã kết nối' : 'Chưa kết nối';
-    }
-    if (statusDesc) { statusDesc.textContent = connected ? `Chat ID: ${cfg.chatId}` : 'Nhập bot token và phát hiện chat'; }
+    const applyStatus = (connected, chatId) => {
+        if (statusBadge) {
+            statusBadge.classList.toggle('status-on', connected);
+            statusBadge.classList.toggle('status-off', !connected);
+            statusBadge.textContent = connected ? 'Đã kết nối' : 'Chưa kết nối';
+        }
+        if (statusDesc) {
+            statusDesc.textContent = connected ? `Chat ID: ${chatId}` : 'Mở bot @tunz_vocab_bot, bấm Bắt đầu và nhập email để liên kết.';
+        }
+    };
+    applyStatus(false, '');
     // nếu đã đăng nhập, tải cấu hình từ server và đồng bộ vào local
     (async () => {
         if (!hasAuthToken()) return;
@@ -446,18 +464,18 @@ function initTelegramUI() {
             const res = await apiTgLoadConfig();
             const sc = res?.telegram || {};
             if (Object.keys(sc).length) {
-                $('tg-token').value = sc.token || cfg.token || '';
                 $('tg-hour').value = sc.hour ?? (cfg.hour ?? 8);
                 $('tg-minute').value = sc.minute ?? (cfg.minute ?? 0);
                 $('tg-enabled').checked = !!(sc.enabled ?? cfg.enabled);
                 saveTgCfg({
-                    token: $('tg-token').value.trim(),
                     chatId: String(sc.chatId || cfg.chatId || ''),
                     hour: Number($('tg-hour').value || 8),
                     minute: Number($('tg-minute').value || 0),
                     enabled: $('tg-enabled').checked
                 });
             }
+            const st = await apiTgStatus();
+            applyStatus(!!st.connected, st.chatId || '');
         } catch { /* ignore */ }
     })();
 }
@@ -481,10 +499,11 @@ function bindEvents() {
     $('btn-analyze').onclick = handleAnalyzeTab;
     $('tg-form').addEventListener('submit', (e) => {
         e.preventDefault();
+        const hourStr = $('tg-hour').value;
+        const minuteStr = $('tg-minute').value;
         const cfg = {
-            token: $('tg-token').value.trim(),
-            hour: Number($('tg-hour').value || 8),
-            minute: Number($('tg-minute').value || 0),
+            hour: hourStr === '' ? 8 : Number(hourStr),
+            minute: minuteStr === '' ? 0 : Number(minuteStr),
             enabled: $('tg-enabled').checked
         };
         saveTgCfg(cfg);
@@ -493,7 +512,11 @@ function bindEvents() {
         (async () => {
             if (hasAuthToken()) {
                 const lc = loadTgCfg();
-                await apiTgSaveConfig({ token: lc.token, chatId: lc.chatId, hour: lc.hour || 8, minute: lc.minute || 0, enabled: lc.enabled });
+                await apiTgSaveConfig({
+                    hour: (lc.hour ?? 8),
+                    minute: (lc.minute ?? 0),
+                    enabled: lc.enabled
+                });
             }
         })();
     });
@@ -524,13 +547,12 @@ function bindEvents() {
         });
     }
     $('tg-test').onclick = async () => {
-        const cfg = loadTgCfg();
-        if (!cfg.token || !cfg.chatId) { $('tg-feedback').textContent = 'Nhập token và chat id trước.'; return; }
+        if (!hasAuthToken()) { $('tg-feedback').textContent = 'Đăng nhập để gửi tin thử.'; return; }
         $('tg-feedback').textContent = 'Đang gửi...';
         try {
-            await telegramSendMessage(cfg.token, cfg.chatId, 'Chào mừng bạn đến với Flash Vocab');
-            $('tg-feedback').textContent = 'Đã gửi!';
-        } catch (e) { $('tg-feedback').textContent = 'Lỗi gửi (server): ' + (e?.message || e); }
+            const r = await apiTgTestSend('Chào mừng bạn đến với Flash Vocab');
+            $('tg-feedback').textContent = r?.ok ? 'Đã gửi!' : 'Không gửi được (chưa liên kết?)';
+        } catch (e) { $('tg-feedback').textContent = 'Lỗi gửi: ' + (e?.message || e); }
     };
     // TTS voice change
     const ttsSel = document.getElementById('tts-voice');

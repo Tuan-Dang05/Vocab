@@ -16,6 +16,7 @@
         <h1>Học Từ Vựng Tiếng Anh</h1>
         <nav class="tabs">
             <button class="tab-button active" data-tab="flashcards">Flashcards</button>
+            <button class="tab-button" data-tab="explore">Khám phá</button>
             <button class="tab-button" data-tab="add">Thêm từ</button>
             <button class="tab-button" data-tab="analyze">Phân tích</button>
             <button class="tab-button" data-tab="telegram">Nhắc Telegram</button>
@@ -38,6 +39,7 @@
                         </div>
                         <div class="phonetics" id="phonetics">&nbsp;</div>
                         <div class="pos" id="pos">&nbsp;</div>
+                        <img id="word-image" class="word-image" alt="" style="display:none" />
                         <div class="progress" id="progress">0 / 0</div>
                     </div>
                     <div class="flashcard-face flashcard-back">
@@ -76,6 +78,17 @@
             <div class="card">
                 <h2>Phân tích</h2>
                 <div id="inline-analysis" class="analysis">—</div>
+            </div>
+        </section>
+
+        <!-- Explore tab -->
+        <section id="tab-explore" class="tab">
+            <div class="explore-header">
+                <h2>Khám phá bộ từ vựng</h2>
+                <p>Chọn một bộ từ vựng để bắt đầu học</p>
+            </div>
+            <div id="vocab-decks" class="vocab-decks">
+                <!-- Vocab decks will be loaded here -->
             </div>
         </section>
 
@@ -224,6 +237,10 @@
     <footer class="app-footer">
         <span>© 2025 Flash Vocab</span>
         <span id="total-count">0 từ</span>
+        <div class="support-contact">
+            <span>Hỗ trợ: <a href="https://zalo.me/0988282936" target="_blank" rel="noopener">Zalo:
+                    0988282936</a></span>
+        </div>
     </footer>
 
     <script src="app.js"></script>

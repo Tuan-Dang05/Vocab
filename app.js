@@ -126,6 +126,11 @@ function setActiveTab(tab) {
     document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
     $(`tab-${tab}`).classList.add('active');
     document.querySelector(`.tab-button[data-tab="${tab}"]`).classList.add('active');
+
+    // Re-render explore tab when switching to it
+    if (tab === 'explore') {
+        renderExploreTab();
+    }
 }
 
 function uuid() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
@@ -277,6 +282,8 @@ function renderInlineAnalysis(v) {
 
     if ((v.phonetics || v.definition || v.example)) {
         box.textContent = buildText({});
+        // Nếu đang học từ bộ (Khám phá), ưu tiên dữ liệu có sẵn trong JSON và không gọi API ngoài
+        if (currentDeckData) return;
     } else {
         box.textContent = 'Đang phân tích...';
     }
@@ -485,10 +492,34 @@ function bindEvents() {
     document.querySelectorAll('.tab-button').forEach(btn => {
         btn.addEventListener('click', () => setActiveTab(btn.getAttribute('data-tab')));
     });
-    $('next').onclick = nextCard;
-    $('prev').onclick = prevCard;
-    $('flip').onclick = flipCard;
-    $('shuffle').onclick = shuffleCards;
+    $('next').onclick = () => {
+        if (currentDeckData) {
+            nextDeckCard();
+        } else {
+            nextCard();
+        }
+    };
+    $('prev').onclick = () => {
+        if (currentDeckData) {
+            prevDeckCard();
+        } else {
+            prevCard();
+        }
+    };
+    $('flip').onclick = () => {
+        if (currentDeckData) {
+            flipDeckCard();
+        } else {
+            flipCard();
+        }
+    };
+    $('shuffle').onclick = () => {
+        if (currentDeckData) {
+            shuffleDeckCards();
+        } else {
+            shuffleCards();
+        }
+    };
     $('mark-known').onclick = markKnown;
     const delBtn = document.getElementById('delete-word');
     if (delBtn) { delBtn.addEventListener('click', deleteCurrentWord); }
@@ -598,6 +629,7 @@ function bootstrap() {
     initTelegramUI();
     refreshBanner();
     refreshAuthUI();
+    renderExploreTab();
     // Populate TTS voice list
     const populateVoices = () => {
         const sel = /** @type {HTMLSelectElement} */(document.getElementById('tts-voice'));
@@ -690,6 +722,328 @@ function refreshAuthUI() {
         logoutBtn.textContent = hasToken ? 'Đăng xuất' : 'Đăng nhập';
         logoutBtn.classList.toggle('danger', !!hasToken);
     }
+}
+
+// Explore tab functionality
+const deckPreviewCache = {}; // filename -> image_url|null
+const vocabDecks = [
+    {
+        id: 'ielts',
+        filename: '900_ielts_words.json',
+        title: '900 Từ Vựng IELTS',
+        description: 'Bộ từ vựng cần thiết cho kỳ thi IELTS',
+        difficulty: 'hard',
+        hasImages: true
+    },
+    {
+        id: 'toefl',
+        filename: '900_toefl_words.json',
+        title: '900 Từ Vựng TOEFL',
+        description: 'Từ vựng quan trọng cho kỳ thi TOEFL',
+        difficulty: 'hard',
+        hasImages: false
+    },
+    {
+        id: 'academic',
+        filename: 'academic_word.json',
+        title: 'Từ Vựng Học Thuật',
+        description: 'Từ vựng chuyên ngành học thuật',
+        difficulty: 'hard',
+        hasImages: false
+    },
+    {
+        id: 'business',
+        filename: 'business_word_list.json',
+        title: 'Từ Vựng Kinh Doanh',
+        description: 'Từ vựng tiếng Anh thương mại',
+        difficulty: 'medium',
+        hasImages: false
+    },
+    {
+        id: 'gre-gmat',
+        filename: 'gre-gmat-vocabulary_list.json',
+        title: 'Từ Vựng GRE/GMAT',
+        description: 'Từ vựng cho kỳ thi GRE và GMAT',
+        difficulty: 'hard',
+        hasImages: false
+    },
+    {
+        id: 'idioms',
+        filename: 'essential_english_idioms.json',
+        title: 'Thành Ngữ Tiếng Anh',
+        description: 'Các thành ngữ tiếng Anh cần thiết',
+        difficulty: 'medium',
+        hasImages: false
+    },
+    {
+        id: 'basic-comm',
+        filename: 'basic_english_communication_vocabulary.json',
+        title: 'Giao Tiếp Cơ Bản',
+        description: 'Từ vựng giao tiếp tiếng Anh cơ bản',
+        difficulty: 'easy',
+        hasImages: false
+    },
+    {
+        id: 'intermediate-comm',
+        filename: 'intermediate_english_communication.json',
+        title: 'Giao Tiếp Trung Cấp',
+        description: 'Từ vựng giao tiếp tiếng Anh trung cấp',
+        difficulty: 'medium',
+        hasImages: false
+    },
+    {
+        id: 'office',
+        filename: 'office_english.json',
+        title: 'Tiếng Anh Văn Phòng',
+        description: 'Từ vựng tiếng Anh trong môi trường văn phòng',
+        difficulty: 'medium',
+        hasImages: false
+    }
+];
+
+let currentDeckData = null;
+let currentDeckIndex = 0;
+let isDeckFlipped = false;
+
+async function loadVocabDeck(filename) {
+    try {
+        const response = await fetch(`DataVocab/${filename}`);
+        if (!response.ok) throw new Error('Failed to load deck');
+        return await response.json();
+    } catch (error) {
+        console.error('Error loading vocab deck:', error);
+        return null;
+    }
+}
+
+function renderExploreTab() {
+    const container = document.getElementById('vocab-decks');
+    if (!container) return;
+
+    container.innerHTML = vocabDecks.map(deck => {
+        const difficultyClass = deck.difficulty;
+        const difficultyText = {
+            easy: 'Dễ',
+            medium: 'Trung bình',
+            hard: 'Khó'
+        }[deck.difficulty];
+
+        return `
+            <div class="vocab-deck-card" data-deck-id="${deck.id}" data-filename="${deck.filename}">
+                <img class="deck-image" alt="${deck.title}" style="display:none;">
+                <div class="deck-no-image">📚 ${deck.title}</div>
+                <h3 class="deck-title">${deck.title}</h3>
+                <p class="deck-description">${deck.description}</p>
+                <div class="deck-stats">
+                    <span class="deck-word-count">~${getDeckWordCount(deck.filename)} từ</span>
+                    <span class="deck-difficulty ${difficultyClass}">${difficultyText}</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Add click event listeners
+    container.querySelectorAll('.vocab-deck-card').forEach(card => {
+        card.addEventListener('click', async () => {
+            const deckId = card.getAttribute('data-deck-id');
+            const filename = card.getAttribute('data-filename');
+            await startDeckStudy(deckId, filename);
+        });
+    });
+
+    // Load preview images from JSON (first image_url if available)
+    container.querySelectorAll('.vocab-deck-card').forEach(async card => {
+        const filename = card.getAttribute('data-filename');
+        const imgEl = card.querySelector('.deck-image');
+        const placeholderEl = card.querySelector('.deck-no-image');
+        if (!filename || !imgEl || !placeholderEl) return;
+
+        // Use cache if available
+        if (Object.prototype.hasOwnProperty.call(deckPreviewCache, filename)) {
+            const cached = deckPreviewCache[filename];
+            if (cached) {
+                imgEl.src = cached;
+                imgEl.onload = () => { imgEl.style.display = ''; placeholderEl.style.display = 'none'; };
+                imgEl.onerror = () => { imgEl.style.display = 'none'; placeholderEl.style.display = ''; };
+            } else {
+                imgEl.style.display = 'none';
+                placeholderEl.style.display = '';
+            }
+            return;
+        }
+
+        try {
+            const data = await loadVocabDeck(filename);
+            if (Array.isArray(data)) {
+                const withImg = data.find(it => it && typeof it.image_url === 'string' && it.image_url.trim() !== '');
+                const url = withImg ? withImg.image_url.trim() : '';
+                deckPreviewCache[filename] = url || null;
+                if (url) {
+                    imgEl.src = url;
+                    imgEl.onload = () => { imgEl.style.display = ''; placeholderEl.style.display = 'none'; };
+                    imgEl.onerror = () => { imgEl.style.display = 'none'; placeholderEl.style.display = ''; };
+                } else {
+                    imgEl.style.display = 'none';
+                    placeholderEl.style.display = '';
+                }
+            }
+        } catch {
+            deckPreviewCache[filename] = null;
+            imgEl.style.display = 'none';
+            placeholderEl.style.display = '';
+        }
+    });
+}
+
+function getDeckWordCount(filename) {
+    // Approximate word counts based on file sizes
+    const counts = {
+        '900_ielts_words.json': 900,
+        '900_toefl_words.json': 900,
+        'academic_word.json': 570,
+        'business_word_list.json': 1000,
+        'gre-gmat-vocabulary_list.json': 800,
+        'essential_english_idioms.json': 500,
+        'basic_english_communication_vocabulary.json': 800,
+        'intermediate_english_communication.json': 600,
+        'office_english.json': 400
+    };
+    return counts[filename] || 'Nhiều';
+}
+
+async function startDeckStudy(deckId, filename) {
+    const deck = vocabDecks.find(d => d.id === deckId);
+    if (!deck) return;
+
+    // Load deck data
+    const deckData = await loadVocabDeck(filename);
+    if (!deckData || deckData.length === 0) {
+        alert('Không thể tải bộ từ vựng này');
+        return;
+    }
+
+    currentDeckData = deckData;
+    currentDeckIndex = 0;
+    isDeckFlipped = false;
+
+    // Switch to flashcards tab and show deck-specific content
+    setActiveTab('flashcards');
+
+    // Update the flashcard with deck data
+    renderDeckFlashcard();
+
+    // Show deck info in banner
+    const bannerText = document.getElementById('banner-text');
+    if (bannerText) {
+        bannerText.textContent = `Đang học: ${deck.title} (${deckData.length} từ)`;
+    }
+}
+
+function renderDeckFlashcard() {
+    if (!currentDeckData || currentDeckData.length === 0) return;
+
+    const card = document.getElementById('flashcard');
+    const inner = document.getElementById('flashcard-inner');
+    isDeckFlipped = false;
+    card.classList.remove('flipped');
+
+    const word = currentDeckData[currentDeckIndex];
+    const progress = document.getElementById('progress');
+
+    // Update flashcard content
+    document.getElementById('word').textContent = word.word || '—';
+    document.getElementById('phonetics').textContent = word.ipa || '';
+    document.getElementById('pos').textContent = word.part_of_speech || '';
+    document.getElementById('definition').textContent = word.definition_vi || '—';
+
+    // Show image if available
+    const imgEl = document.getElementById('word-image');
+    if (imgEl) {
+        const url = (word.image_url || '').trim();
+        if (url) {
+            imgEl.style.display = 'none';
+            imgEl.src = url;
+            imgEl.onload = () => { imgEl.style.display = ''; };
+            imgEl.onerror = () => { imgEl.style.display = 'none'; };
+        } else {
+            imgEl.style.display = 'none';
+            imgEl.removeAttribute('src');
+        }
+    }
+
+    // Handle examples
+    const exampleText = word.examples_vi && word.examples_vi.length > 0
+        ? word.examples_vi[0]
+        : '—';
+    document.getElementById('example').textContent = exampleText;
+
+    progress.textContent = `${currentDeckIndex + 1} / ${currentDeckData.length}`;
+
+    // Update audio button
+    const audioBtn = document.getElementById('play-audio');
+    audioBtn.classList.remove('playing');
+    audioBtn.onclick = () => {
+        const stopTTS = () => {
+            try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (_) { }
+        }
+        const playAudioUrl = (url) => {
+            const a = new Audio(url);
+            audioBtn.classList.add('playing');
+            a.play().finally(() => audioBtn.classList.remove('playing')).catch(() => audioBtn.classList.remove('playing'));
+        }
+        if (word.audio_url) {
+            stopTTS();
+            playAudioUrl(word.audio_url);
+        } else if ('speechSynthesis' in window) {
+            const utter = new SpeechSynthesisUtterance(word.word);
+            const selectedVoiceURI = localStorage.getItem(TTS_KEY);
+            const voices = window.speechSynthesis.getVoices();
+            const voice = voices.find(vc => vc.voiceURI === selectedVoiceURI) || voices.find(vc => /^en(-|_)/i.test(vc.lang)) || voices[0];
+            if (voice) { utter.voice = voice; utter.lang = voice.lang; }
+            audioBtn.classList.add('playing');
+            utter.onend = () => audioBtn.classList.remove('playing');
+            utter.onerror = () => audioBtn.classList.remove('playing');
+            window.speechSynthesis.speak(utter);
+        }
+    };
+
+    // Update inline analysis - use JSON fields directly (no external API)
+    renderInlineAnalysis({
+        word: word.word,
+        phonetics: word.ipa || '',
+        pos: word.part_of_speech || '',
+        definition: word.definition_vi || '',
+        example: (word.examples_vi && word.examples_vi[0]) || ''
+    });
+}
+
+function nextDeckCard() {
+    if (!currentDeckData) return;
+    currentDeckIndex = (currentDeckIndex + 1) % currentDeckData.length;
+    renderDeckFlashcard();
+}
+
+function prevDeckCard() {
+    if (!currentDeckData) return;
+    currentDeckIndex = currentDeckIndex === 0 ? currentDeckData.length - 1 : currentDeckIndex - 1;
+    renderDeckFlashcard();
+}
+
+function flipDeckCard() {
+    if (!currentDeckData) return;
+    isDeckFlipped = !isDeckFlipped;
+    document.getElementById('flashcard').classList.toggle('flipped', isDeckFlipped);
+}
+
+function shuffleDeckCards() {
+    if (!currentDeckData) return;
+    // Fisher-Yates shuffle
+    for (let i = currentDeckData.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [currentDeckData[i], currentDeckData[j]] = [currentDeckData[j], currentDeckData[i]];
+    }
+    currentDeckIndex = 0;
+    renderDeckFlashcard();
 }
 
 document.addEventListener('DOMContentLoaded', bootstrap);

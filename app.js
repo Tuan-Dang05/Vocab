@@ -620,6 +620,41 @@ function bindEvents() {
     }
     const logoutBtn = document.getElementById('btn-logout');
     if (logoutBtn) { logoutBtn.addEventListener('click', async () => { if (!hasAuthToken()) { setActiveTab('account'); window.scrollTo({ top: 0, behavior: 'smooth' }); return; } try { await apiLogout(); } catch { } deleteCookie(AUTH_COOKIE); localStorage.removeItem(AUTH_EMAIL_KEY); document.getElementById('auth-status').textContent = 'Chưa đăng nhập'; refreshBanner(); refreshAuthUI(); setActiveTab('flashcards'); window.scrollTo({ top: 0, behavior: 'smooth' }); }); }
+
+    // Touch gestures on flashcard
+    const cardEl = document.getElementById('flashcard');
+    if (cardEl) {
+        let startX = 0;
+        let startY = 0;
+        let isTouching = false;
+        const H_THRESHOLD = 40; // px
+
+        cardEl.addEventListener('touchstart', (e) => {
+            const t = e.changedTouches && e.changedTouches[0];
+            if (!t) return;
+            startX = t.clientX;
+            startY = t.clientY;
+            isTouching = true;
+        }, { passive: true });
+
+        cardEl.addEventListener('touchend', (e) => {
+            if (!isTouching) return;
+            isTouching = false;
+            const t = e.changedTouches && e.changedTouches[0];
+            if (!t) return;
+            const dx = t.clientX - startX;
+            const dy = t.clientY - startY;
+            if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > H_THRESHOLD) {
+                if (dx > 0) {
+                    // Swipe right -> flip card
+                    if (currentDeckData) { flipDeckCard(); } else { flipCard(); }
+                } else {
+                    // Swipe left -> next card
+                    if (currentDeckData) { nextDeckCard(); } else { nextCard(); }
+                }
+            }
+        }, { passive: true });
+    }
 }
 
 function bootstrap() {
